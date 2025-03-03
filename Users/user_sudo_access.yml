@@ -1,0 +1,28 @@
+---
+- name: Create user with sudo previleges
+  hosts: all
+  become: yes
+  tasks:
+  - name: Create user account
+    user:
+      name: esrkmr
+      uid: 1001
+      gid: 1001
+      password: "{{ 'Test@123' | password_hash ('sha512') }}"
+      shell: /bin/bash
+      atate: present
+
+  - name: Add account to sudo group
+    user:
+      name: esrkmr
+      groups: itadmin
+      append: yes
+
+  - name: Allow passwordless sudo for the user
+    inlinefile:
+      path: /etc/sudoers.d/itadmin
+      state: present
+      regexp: '^esrkmr'
+      line: 'esrkmr ALL=(ALL) NOPASSWD:ALL'
+      validate: '/usr/sbin/visudo -cf %s'
+
