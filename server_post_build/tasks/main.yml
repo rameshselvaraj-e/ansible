@@ -1,0 +1,24 @@
+#SPDX-License-Identifier: MIT-0
+---
+# tasks file for server_post_build
+---
+- name: Include OS specific vars
+  include_vars: "{{ ansible_os_family }}.yml"
+
+- name: Update system packages
+  import_tasks: update.yml
+
+- name: Configure Active Directory authentication
+  import_tasks: ad_auth.yml
+
+- name: Configure PAM settings
+  import_tasks: pam.yml
+
+- name: Install and configure Splunk agent
+  import_tasks: splunk.yml
+
+- name: Install and configure Rudder agent
+  import_tasks: rudder.yml
+
+- name: Install and configure ESET agent
+  import_tasks: eset.yml

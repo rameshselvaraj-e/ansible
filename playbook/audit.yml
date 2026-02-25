@@ -1,0 +1,53 @@
+# validate_permissions.yml
+---
+- name: Validate File Permissions
+  hosts: all
+  gather_facts: false
+  become: true # May be needed for checking files root owns/accesses
+
+  # Load the variables from the input file
+  vars_files:
+    - files_to_check.yml
+
+  tasks:
+    - name: Use stat to retrieve file facts
+      # Loop through the list defined in the vars file
+      ansible.builtin.stat:
+        path: "{{ item.path }}"
+      register: file_stats
+      loop: "{{ file_permissions_list }}"
+      loop_control:
+        label: "{{ item.path }}" # Makes the output clearer
+
+    - name: Fail if file does not exist
+      ansible.builtin.fail:
+        msg: "Validation failed: File {{ item.item.path }} does not exist."
+      # Check if the file was found
+      when: not item.stat.exists
+      loop: "{{ file_stats.results }}"
+      loop_control:
+        label: "{{ item.item.path }}"
+    
+    - name: Fail if permissions (mode), owner, or group are incorrect
+      ansible.builtin.fail:
+        msg: >
+          Validation failed for {{ item.item.path }}:
+            - Expected Mode: {{ item.item.expected_mode }}, Found: {{ item.stat.mode }}
+            - Expected Owner: {{ item.item.owner }}, Found: {{ item.stat.pw_name }}
+            - Expected Group: {{ item.item.group }}, Found: {{ item.stat.gr_name }}
+      # Condition to fail if any of the checks don't match the expectation
+      when:
+        - item.stat.exists # Only check permissions if the file exists
+        # Ansible stat returns the octal mode as a string like '0755', so compare it to the quoted string from vars
+        - item.stat.mode != item.item.expected_mode or
+        - item.stat.pw_name != item.item.owner or
+        - item.stat.gr_name != item.item.group
+      loop: "{{ file_stats.results }}"
+      loop_control:
+        label: "{{ item.item.path }}"
+    
+    - name: Report successful validation
+      ansible.builtin.debug:
+        msg: "All specified file permissions, owners, and groups are correctly validated."
+      # This task will only run if none of the 'fail' tasks were triggered
+      when: ansible_play_batch | length > 0

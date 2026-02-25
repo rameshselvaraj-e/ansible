@@ -1,0 +1,14 @@
+---
+- name: Install Rudder agent
+  package:
+    name: rudder-agent
+    state: present
+
+- name: Configure Rudder server
+  command: rudder agent policy-server {{ rudder_server }}
+
+- name: Start Rudder agent
+  service:
+    name: rudder-agent
+    enabled: yes
+    state: started

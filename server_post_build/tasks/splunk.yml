@@ -1,0 +1,17 @@
+---
+- name: Install Splunk Forwarder (RHEL)
+  when: ansible_os_family == "RedHat"
+  yum:
+    name: splunkforwarder.rpm
+    state: present
+
+- name: Install Splunk Forwarder (Ubuntu)
+  when: ansible_os_family == "Debian"
+  apt:
+    deb: splunkforwarder.deb
+
+- name: Start Splunk service
+  service:
+    name: splunk
+    enabled: yes
+    state: started

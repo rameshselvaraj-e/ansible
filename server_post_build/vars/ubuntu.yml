@@ -1,0 +1,9 @@
+package_update_module: apt
+ad_packages:
+  - realmd
+  - sssd
+  - sssd-tools
+  - libnss-sss
+  - libpam-sss
+  - adcli
+  - samba-common-bin

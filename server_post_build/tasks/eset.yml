@@ -1,0 +1,11 @@
+---
+- name: Install ESET package
+  package:
+    name: eset-agent
+    state: present
+
+- name: Ensure ESET service is running
+  service:
+    name: eset
+    enabled: yes
+    state: started

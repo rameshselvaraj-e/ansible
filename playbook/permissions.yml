@@ -1,0 +1,12 @@
+---
+files_info:
+  - expected_file_path: "/etc/hosts"
+    expected_permissions: "0644"
+  - expected_file_path: "/etc/passwd"
+    expected_permissions: "0644"
+  - expected_file_path: "/etc/group"
+    expected_permissions: "0644"
+  - expected_file_path: "/etc/shadow"
+    expected_permissions: "0644"
+  - expected_file_path: "/etc/profile"
+    expected_permissions: "0644"

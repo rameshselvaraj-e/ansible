@@ -1,0 +1,33 @@
+---
+- name: Validate file permissions
+  hosts: all
+  gather_facts: false
+
+  vars_files:
+    -  expected_permission.yml
+
+  tasks:
+    - name: Check file permissions for each file
+      ansible.builtin.stat:
+        path: "{{ item.path }}"
+      register: file_stat_result
+      loop: "{{ files_to_check }}"
+      loop_control:
+        label: "{{ item.path }}"
+
+    - name: Report permission discrepancies
+      ansible.builtin.debug:
+        msg: "Permissions for {{ item.item.path }} are incorrect. Expected: {{ item.item.expected_mode }}, Found: {{ item.stat.mode }}"
+      when: item.stat.exists and item.stat.mode != item.item.expected_mode
+      loop: "{{ file_stat_result.results }}"
+      loop_control:
+        label: "{{ item.item.path }}"
+
+    - name: Correct file permissions if needed (optional)
+      ansible.builtin.file:
+        path: "{{ item.item.path }}"
+        mode: "{{ item.item.expected_mode }}"
+      when: item.stat.exists and item.stat.mode != item.item.expected_mode
+      loop: "{{ file_stat_result.results }}"
+      loop_control:
+        label: "{{ item.item.path }}"

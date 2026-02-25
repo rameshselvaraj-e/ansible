@@ -1,0 +1,30 @@
+---
+- name: Validate file permissions
+  hosts: all
+  gather_facts: false
+
+  vars_prompt:
+    - name: file_to_check
+      prompt: "Enter the full path to the file you want to check"
+      private: false
+    - name: expected_permissions
+      prompt: "Enter the expected octal permissions (e.g., 0644)"
+      private: false
+
+  tasks:
+    - name: Get file stats
+      ansible.builtin.stat:
+        path: "{{ file_to_check }}"
+      register: file_stats
+
+    - name: Check if file exists
+      ansible.builtin.fail:
+        msg: "File '{{ file_to_check }}' does not exist."
+      when: not file_stats.stat.exists
+
+    - name: Validate file permissions
+      ansible.builtin.assert:
+        that:
+          - file_stats.stat.mode == expected_permissions
+        fail_msg: "FAIL: Permissions for '{{ file_to_check }}' are {{ file_stats.stat.mode }}, expected {{ expected_permissions }}"
+        success_msg: "PASS: Permissions for '{{ file_to_check }}' are {{ file_stats.stat.mode }}, as expected"

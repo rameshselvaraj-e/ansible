@@ -1,0 +1,17 @@
+---
+- name: Install AD related packages
+  package:
+    name: "{{ ad_packages }}"
+    state: present
+
+- name: Join domain
+  command: >
+    realm join {{ ad_domain }}
+    --user={{ ad_join_user }}
+  when: not ad_already_joined | default(false)
+
+- name: Ensure SSSD is enabled
+  service:
+    name: sssd
+    enabled: yes
+    state: started

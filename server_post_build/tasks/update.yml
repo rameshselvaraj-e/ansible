@@ -1,0 +1,13 @@
+---
+- name: Update all packages (RHEL)
+  when: ansible_os_family == "RedHat"
+  dnf:
+    name: "*"
+    state: latest
+    update_cache: yes
+
+- name: Update all packages (Ubuntu)
+  when: ansible_os_family == "Debian"
+  apt:
+    upgrade: dist
+    update_cache: yes

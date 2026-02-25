@@ -1,0 +1,7 @@
+---
+- name: Post build configuration
+  hosts: new_servers
+  become: yes
+
+  roles:
+    - server_postbuild

@@ -1,0 +1,8 @@
+package_update_module: dnf
+ad_packages:
+  - realmd
+  - sssd
+  - oddjob
+  - oddjob-mkhomedir
+  - adcli
+  - samba-common-tools

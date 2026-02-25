@@ -1,0 +1,14 @@
+file_permissions_list:
+  - path: /etc/hosts
+    expected_mode: "0644"
+    owner: root
+    group: root
+    expected_group: root
+  - path: /etc/passwd
+    expected_mode: "0600"
+    owner: root
+    group: root
+  - path: /etc/group
+    expected_mode: "0644"
+    owner: root
+    group: root  

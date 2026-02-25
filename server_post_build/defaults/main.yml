@@ -1,0 +1,7 @@
+#SPDX-License-Identifier: MIT-0
+---
+# defaults file for server_post_build
+
+install_splunk: true
+install_rudder: true
+install_eset: true
