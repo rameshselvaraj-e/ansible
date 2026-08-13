@@ -1,0 +1,198 @@
+---
+- name: OS Patching with Pre and Post Tasks
+  hosts: all
+  become: true
+  serial: 2 # Patch 2 servers at a time to prevent total downtime
+
+  vars:
+    patch_reboot: true
+    patch_security_only: false
+    min_root_free_mb: 2048
+    patch_maintenance_window: true
+
+  pre_tasks:
+    - name: Pre-Patching - Check connectivity and uptime
+      ansible.builtin.command: uptime -p
+      register: server_uptime
+      changed_when: false
+      tags: [precheck]
+
+    - name: Pre-Patching - Print server uptime
+      ansible.builtin.debug:
+        msg: "Current uptime for {{ inventory_hostname }} is: {{ server_uptime.stdout }}"
+      tags: [precheck]
+
+    - name: Get available root filesystem space in MB
+      ansible.builtin.shell: |
+        set -o pipefail
+        df -Pm / | awk 'NR==2 {print $4}'
+      args:
+        executable: /bin/bash
+      register: root_free_mb
+      changed_when: false
+      tags: [precheck]
+
+    - name: Stop patching when free root space is insufficient
+      ansible.builtin.assert:
+        that:
+          - root_free_mb.stdout | int >= min_root_free_mb | int
+        fail_msg: >-
+          Root filesystem has only {{ root_free_mb.stdout }} MB free.
+          Required minimum: {{ min_root_free_mb }} MB.
+      tags: [precheck]
+
+    - name: Report patch start
+      ansible.builtin.debug:
+        msg: >-
+          Starting patching on {{ inventory_hostname }};
+          OS={{ ansible_facts.distribution }} {{ ansible_facts.distribution_version }};
+          uptime={{ server_uptime.stdout }}.
+      tags: [precheck]
+
+
+  tasks:
+    - name: Update APT metadata
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+      when: ansible_facts.os_family == 'Ubuntu'
+      tags: [patch]
+
+    - name: Patch Ubuntu systems
+      ansible.builtin.apt:
+        upgrade: dist
+        only_upgrade: true
+        autoremove: false
+      register: patch_result
+      when: ansible_facts.os_family == 'Ubuntu'
+      tags: [patch]
+        
+    - name: Check Debian reboot marker
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+      register: debian_reboot_marker
+      when: ansible_facts.os_family == 'Ubuntu'
+      tags: [reboot]
+
+
+    - name: Check RHEL reboot requirement
+      ansible.builtin.command: needs-restarting -r
+      register: rhel_reboot_check
+      changed_when: false
+      failed_when: rhel_reboot_check.rc not in [0, 1, 127]
+      when: ansible_facts.os_family == 'RedHat'
+      tags: [reboot]
+
+    - name: Set reboot requirement
+      ansible.builtin.set_fact:
+        reboot_required: >-
+          {{
+            (ansible_facts.os_family == 'Debian' and debian_reboot_marker.stat.exists)
+            or
+            (ansible_facts.os_family == 'RedHat' and rhel_reboot_check.rc == 1)
+            or
+            (ansible_facts.os_family == 'Suse' and patch_result.changed)
+          }}
+      tags: [reboot]
+
+    - name: Reboot Linux host when required
+      ansible.builtin.reboot:
+        reboot_timeout: 1800
+        connect_timeout: 10
+        pre_reboot_delay: 10
+        post_reboot_delay: 30
+        test_command: uptime
+      when:
+        - patch_reboot | bool
+        - reboot_required | bool
+      tags: [reboot]
+
+  post_tasks:
+    - name: Verify host is reachable after patching
+      ansible.builtin.wait_for_connection:
+        timeout: 300
+      tags: [postcheck]
+
+    - name: Gather post-patch package facts
+      ansible.builtin.package_facts:
+        manager: auto
+      tags: [postcheck]
+
+    - name: Run optional post-patch restore command
+      ansible.builtin.command: "{{ patch_post_command }}"
+      when: patch_post_command | length > 0
+      changed_when: true
+      tags: [postcheck, drain]
+
+    - name: Publish patch result to job statistics
+      ansible.builtin.set_stats:
+        data:
+          patched_hosts: "{{ ansible_play_hosts_all | length }}"
+          last_patched_host: "{{ inventory_hostname }}"
+          reboot_required: "{{ reboot_required | bool }}"
+          packages_changed: "{{ patch_result.changed | default(false) }}"
+      tags: [postcheck]
+
+    - name: Report successful patch result
+      ansible.builtin.debug:
+        msg: >-
+          PATCH SUCCESS: host={{ inventory_hostname }},
+          packages_changed={{ patch_result.changed | default(false) }},
+          reboot_required={{ reboot_required | bool }}.
+      tags: [postcheck]
+
+
+      #    - name: Pre-Patching - Stop application service safely
+#      ansible.builtin.systemd:
+#        name: nginx
+#        state: stopped
+#      failed_when: false # Prevents failure if the service is not installed on all hosts
+
+#  tasks:
+#    # ------------------ UBUNTU PATCHING ------------------
+#    - name: Ubuntu - Update cache and upgrade packages
+#      ansible.builtin.apt:
+#        update_cache: true
+#        upgrade: dist
+#      when: ansible_os_family == "Ubuntu"
+#
+#    - name: Ubuntu - Check if reboot is required
+#      ansible.builtin.stat:
+#        path: /var/run/reboot-required
+#      register: ubuntu_reboot
+#      when: ansible_os_family == "Ubuntu"
+#
+#    # ------------------ RHEL PATCHING ------------------
+#    - name: RHEL - Upgrade all packages
+#      ansible.builtin.dnf:
+#        name: "*"
+#        state: latest
+#      when: ansible_os_family == "RedHat"
+#
+#    - name: RHEL - Check if reboot is required
+#      ansible.builtin.command: needs-restarting -r
+#      register: rhel_reboot
+#      failed_when: false
+#      changed_when: rhel_reboot.rc == 1
+#      when: ansible_os_family == "RedHat"
+#
+#  post_tasks:
+#    - name: Post-Patching - Start application service
+#      ansible.builtin.systemd:
+#        name: nginx
+#        state: started
+#      failed_when: false
+#
+#    - name: Post-Patching - Verify service status
+#      ansible.builtin.uri:
+#        url: "http://localhost"
+#        status_code: 200
+#      register: service_check
+#      until: service_check.status == 200
+#      retries: 6
+#      delay: 10
+#      failed_when: false
+
+    - name: Post-Patching - Confirm system health
+      ansible.builtin.debug:
+        msg: "Patching cycle complete for {{ inventory_hostname }}."

@@ -1,0 +1,32 @@
+---
+- name: OS Patching Automation
+  hosts: all
+  become: yes
+  serial: "30%" # Update only 30% of servers at a time to prevent downtime
+  
+  tasks:
+    - name: Upgrade all packages on Ubuntu/Debian
+      apt:
+        upgrade: dist
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Upgrade all packages on RedHat/CentOS
+      yum:
+        name: "*"
+        state: latest
+      when: ansible_os_family == "RedHat"
+
+    - name: Check if reboot is required (Debian/Ubuntu)
+      stat:
+        path: /var/run/reboot-required
+      register: reboot_required_file
+
+    - name: Reboot server if patch requires it
+      reboot:
+        msg: "Rebooting due to OS patching"
+        connect_timeout: 5
+        reboot_timeout: 300
+        pre_reboot_delay: 0
+        post_reboot_delay: 30
+      when: ansible_os_family == "Debian" and reboot_required_file.stat.exists
