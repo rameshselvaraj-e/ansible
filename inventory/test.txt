@@ -6,6 +6,6 @@
 #10.0.10.21
 #10.0.10.22
 #10.0.10.23
-[patch_targets:vars]
-ansible_user=itadmin
-ansible_ssh_private_key_file=/home/itadmin/.ssh/id_rsa
+#[patch_targets:vars]
+#ansible_user=itadmin
+#ansible_ssh_private_key_file=/home/itadmin/.ssh/id_rsa
